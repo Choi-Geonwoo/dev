@@ -1,0 +1,83 @@
+:root {
+    --primary: #4f46e5;
+    --income: #10b981;
+    --expense: #ef4444;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --radius: 12px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Pretendard', sans-serif; background: var(--bg); display: flex; }
+
+/* 레이아웃 분리: 사이드바고정 */
+.sidebar {
+    width: 260px;
+    height: 100vh;
+    background: var(--card);
+    padding: 30px 20px;
+    border-right: 1px solid var(--border);
+    position: fixed;
+}
+
+.main-content {
+    margin-left: 260px;
+    width: calc(100% - 260px);
+    padding: 40px;
+}
+
+/* 메뉴 스타일 */
+.nav-menu { list-style: none; margin-top: 30px; }
+.nav-item {
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    display: block;
+    text-decoration: none;
+    color: #64748b;
+}
+.nav-item.active { background: var(--primary); color: #fff; font-weight: 600; }
+
+/* 카드 및 공통 요소 */
+.card { background: var(--card); border-radius: var(--radius); padding: 25px; border: 1px solid var(--border); margin-bottom: 20px; }
+.btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; }
+.btn-primary { background: var(--primary); color: #fff; }
+
+
+/* 1. 실제 못생긴 input은 숨깁니다 */
+#excelFile {
+    display: none;
+}
+
+/* 2. input 대신 클릭될 예쁜 라벨(버튼 모양) */
+.file-upload-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 15px;
+    background-color: #f8fafc;
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.file-upload-label:hover {
+    background-color: #f1f5f9;
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+/* 3. 파일이 선택되었을 때 보여줄 파일명 스타일 */
+#fileNameDisplay {
+    margin-top: 8px;
+    font-size: 0.85rem;
+    color: var(--primary);
+    font-weight: 600;
+    text-align: center;
+}

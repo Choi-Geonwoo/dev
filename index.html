@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="style.css">
+    <title>Dashboard - Smart Wallet</title>
+</head>
+<body>
+
+<nav class="sidebar">
+    <h2>Smart Wallet</h2>
+    <ul class="nav-menu">
+        <li><a href="index.html" class="nav-item active">🏠 대시보드</a></li>
+        <li><a href="history.html" class="nav-item">📜 거래 내역</a></li>
+        <li><a href="assets.html" class="nav-item">🏦 자산 관리</a></li>
+        <li><a href="categories.html" class="nav-item">🏷️ 카테고리 설정</a></li>
+    </ul>
+</nav>
+
+<main class="main-content">
+    <header style="margin-bottom: 30px;">
+        <h1>3월 자산 리포트 📈</h1>
+        <p id="todayDate" style="color: #64748b;"></p>
+    </header>
+
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px;">
+        <div class="card">
+            <span style="font-size: 0.9rem; color: #64748b;">전체 자산 합계</span>
+            <h2 id="totalBalance">0원</h2>
+        </div>
+        <div class="card">
+            <span style="font-size: 0.9rem; color: #64748b;">이번 달 지출</span>
+            <h2 id="monthExpense" style="color:var(--expense)">0원</h2>
+        </div>
+        <div class="card">
+            <span style="font-size: 0.9rem; color: #64748b;">남은 예산 (권장)</span>
+            <h2 id="remainingBudget">0원</h2>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px;">
+        <div class="card">
+            <h4>카테고리별 지출 비중</h4>
+            <div id="categoryStats" style="margin-top: 20px;">
+                <p style="text-align: center; color: #94a3b8; padding: 40px;">데이터가 부족합니다.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h4>최근 거래 내역</h4>
+            <ul id="recentList" style="list-style: none; margin-top: 15px;">
+            </ul>
+            <button class="btn btn-outline" style="width: 100%; margin-top: 15px;" onclick="location.href='history.html'">더보기</button>
+        </div>
+    </div>
+</main>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // 데이터 불러오기
+        const assets = JSON.parse(localStorage.getItem('myAssets')) || [];
+        const histories = JSON.parse(localStorage.getItem('myHistories')) || [];
+
+        // 날짜 표시
+        const now = new Date();
+        document.getElementById('todayDate').innerText = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 기준`;
+
+        // 1. 전체 자산 합계 계산
+        const total = assets.reduce((sum, asset) => sum + Number(asset.balance), 0);
+        document.getElementById('totalBalance').innerText = total.toLocaleString() + '원';
+
+        // 2. 이번 달 지출 합계 계산
+        const currentMonth = now.toISOString().substring(0, 7); // "2024-03" 형식
+        const monthTotal = histories
+            .filter(item => item.date.startsWith(currentMonth))
+            .reduce((sum, item) => sum + Number(item.amount), 0);
+        document.getElementById('monthExpense').innerText = monthTotal.toLocaleString() + '원';
+
+        // 3. 예산 대비 남은 금액 (예시: 목표 예산 200만원 설정 시)
+        const goal = 2000000;
+        const remaining = goal - monthTotal;
+        document.getElementById('remainingBudget').innerText = (remaining > 0 ? remaining : 0).toLocaleString() + '원';
+
+        // 4. 최근 거래 내역 5건 표시
+        const recentList = document.getElementById('recentList');
+        const recentData = histories.slice(0, 5); // 이미 history에서 정렬되어 저장됨
+
+        if (recentData.length > 0) {
+            recentList.innerHTML = recentData.map(item => `
+                <li style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem;">
+                    <span>${item.description}</span>
+                    <span style="font-weight: bold; color: var(--expense)">-${Number(item.amount).toLocaleString()}원</span>
+                </li>
+            `).join('');
+        }
+
+        // 5. 간단한 카테고리 통계 (글자로 표시)
+        const catStats = document.getElementById('categoryStats');
+        if (histories.length > 0) {
+            const catMap = {};
+            histories.forEach(h => {
+                catMap[h.category] = (catMap[h.category] || 0) + Number(h.amount);
+            });
+
+            let statsHtml = '';
+            for (const [cat, amt] of Object.entries(catMap)) {
+                const percent = ((amt / monthTotal) * 100).toFixed(0);
+                statsHtml += `
+                    <div style="margin-bottom: 15px;">
+                        <div style="display:flex; justify-content:space-between; font-size: 0.85rem; margin-bottom: 5px;">
+                            <span>${cat}</span><span>${percent}%</span>
+                        </div>
+                        <div style="width:100%; height:8px; background:#f1f5f9; border-radius:4px;">
+                            <div style="width:${percent}%; height:100%; background:var(--primary); border-radius:4px;"></div>
+                        </div>
+                    </div>
+                `;
+            }
+            catStats.innerHTML = statsHtml;
+        }
+    });
+</script>
+
+</body>
+</html>

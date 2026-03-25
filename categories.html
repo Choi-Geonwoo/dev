@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="style.css">
+    <title>Categories - Smart Wallet</title>
+    <style>
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; margin-top: 20px; }
+        .cat-card {
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            text-align: center;
+            background: #fff;
+            position: relative;
+            transition: 0.2s;
+        }
+        .cat-card:hover { border-color: var(--primary); transform: translateY(-3px); }
+        .cat-emoji { font-size: 1.5rem; display: block; margin-bottom: 8px; }
+
+        /* 카드 내 수정/삭제 버튼 */
+        .cat-actions { margin-top: 10px; display: flex; justify-content: center; gap: 10px; opacity: 0.6; }
+        .cat-actions:hover { opacity: 1; }
+        .btn-small { font-size: 0.75rem; cursor: pointer; border: none; background: none; color: #64748b; }
+        .btn-small.del { color: var(--expense); }
+
+        /* 모달 스타일 */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); place-items: center; z-index: 1000; }
+        .modal-content { background: #fff; padding: 30px; border-radius: var(--radius); width: 350px; }
+        .input-field { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+<nav class="sidebar">
+    <h2>Smart Wallet</h2>
+    <ul class="nav-menu">
+        <li><a href="index.html" class="nav-item">🏠 대시보드</a></li>
+        <li><a href="history.html" class="nav-item">📜 거래 내역</a></li>
+        <li><a href="assets.html" class="nav-item">🏦 자산 관리</a></li>
+        <li><a href="categories.html" class="nav-item active">🏷️ 카테고리 설정</a></li>
+    </ul>
+</nav>
+
+<main class="main-content">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1>카테고리 설정</h1>
+        <button class="btn btn-primary" onclick="openCatModal()">+ 카테고리 추가</button>
+    </div>
+
+    <div id="categoryGrid" class="grid">
+    </div>
+</main>
+
+<div id="catModal" class="modal">
+    <div class="modal-content">
+        <h3 id="catModalTitle">카테고리 편집</h3>
+        <input type="hidden" id="editCatId">
+
+        <div style="margin: 20px 0;">
+            <label style="font-size:0.8rem; color:#64748b;">카테고리명 (아이콘 포함 가능)</label>
+            <input type="text" id="catName" placeholder="예: 🍔 식비" class="input-field">
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-outline" style="flex:1" onclick="closeCatModal()">취소</button>
+            <button class="btn btn-primary" style="flex:2" onclick="saveCategory()">저장하기</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. 초기 데이터 (기본 카테고리 제공)
+    let categories = JSON.parse(localStorage.getItem('myCategories')) || [
+        { id: Date.now(), name: "🍔 식비" },
+        { id: Date.now()+1, name: "🚗 교통" },
+        { id: Date.now()+2, name: "🏠 주거" },
+        { id: Date.now()+3, name: "🎁 쇼핑" }
+    ];
+
+    const grid = document.getElementById('categoryGrid');
+    const modal = document.getElementById('catModal');
+
+    // 2. 렌더링 함수
+    function renderCategories() {
+        grid.innerHTML = '';
+        categories.forEach(cat => {
+            const card = document.createElement('div');
+            card.className = 'cat-card';
+            card.innerHTML = `
+                <span style="font-weight:600; font-size:1.1rem;">${cat.name}</span>
+                <div class="cat-actions">
+                    <button class="btn-small" onclick="editCategory(${cat.id})">수정</button>
+                    <button class="btn-small del" onclick="deleteCategory(${cat.id})">삭제</button>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+        localStorage.setItem('myCategories', JSON.stringify(categories));
+    }
+
+    // 3. 모달 제어
+    function openCatModal() {
+        document.getElementById('catModalTitle').innerText = "새 카테고리 추가";
+        document.getElementById('editCatId').value = "";
+        document.getElementById('catName').value = "";
+        modal.style.display = 'grid';
+    }
+
+    function editCategory(id) {
+        const cat = categories.find(c => c.id === id);
+        document.getElementById('catModalTitle').innerText = "카테고리 수정";
+        document.getElementById('editCatId').value = cat.id;
+        document.getElementById('catName').value = cat.name;
+        modal.style.display = 'grid';
+    }
+
+    function closeCatModal() { modal.style.display = 'none'; }
+
+    // 4. 저장 로직
+    function saveCategory() {
+        const id = document.getElementById('editCatId').value;
+        const name = document.getElementById('catName').value;
+
+        if (!name) return alert("이름을 입력해주세요.");
+
+        if (id) {
+            const index = categories.findIndex(c => c.id == id);
+            categories[index].name = name;
+        } else {
+            categories.push({ id: Date.now(), name: name });
+        }
+
+        renderCategories();
+        closeCatModal();
+    }
+
+    // 5. 삭제 로직
+    function deleteCategory(id) {
+        if (confirm("이 카테고리를 삭제하시겠습니까?\n기존 내역의 카테고리명은 유지되지만 새로 선택할 수 없게 됩니다.")) {
+            categories = categories.filter(c => c.id !== id);
+            renderCategories();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', renderCategories);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="style.css">
+    <title>Assets - Smart Wallet</title>
+    <style>
+        /* 모달 스타일 추가 (기본 설정) */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); place-items: center; z-index: 1000; }
+        .modal-content { background: #fff; padding: 30px; border-radius: var(--radius); width: 90%; max-width: 400px; }
+
+        /* 기존 스타일 유지 */
+        .label { display: block; font-size: 0.85rem; margin-bottom: 5px; color: #64748b; margin-top: 15px; }
+        .input-field { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; }
+        .btn-edit { background: #f1f5f9; color: var(--primary); border: none; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
+        .btn-delete { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 0.8rem; margin-left: 5px; }
+
+        /* 리스트 아이템 스타일 보강 */
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid var(--border); }
+        .item-info { display: flex; align-items: center; gap: 15px; }
+        .icon { font-size: 1.5rem; background: #f8fafc; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; border-radius: 10px; }
+    </style>
+</head>
+<body>
+<nav class="sidebar">
+    <h2>Smart Wallet</h2>
+    <ul class="nav-menu">
+        <li><a href="index.html" class="nav-item">🏠 대시보드</a></li>
+        <li><a href="history.html" class="nav-item">📜 거래 내역</a></li>
+        <li><a href="assets.html" class="nav-item active">🏦 자산 관리</a></li>
+        <li><a href="categories.html" class="nav-item">🏷️ 카테고리 설정</a></li>
+    </ul>
+</nav>
+
+<main class="main-content">
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>내 자산 관리</h2>
+            <button class="btn btn-primary">+ 새 계좌 등록</button>
+        </div>
+        <p style="color: #64748b; margin-top: 10px;">등록된 자산은 엑셀 업로드 시 선택 항목으로 나타납니다.</p>
+    </div>
+    <div class="card">
+        <div style="margin-bottom: 20px;">
+            <input type="text" id="assetSearch" placeholder="자산 이름 검색..." class="input-field">
+        </div>
+    </div>
+    <div class="card" id="assetList">
+    </div>
+</main>
+
+<div id="assetModal" class="modal">
+    <div class="modal-content">
+        <h3 id="modalTitle">새 자산 등록</h3>
+        <input type="hidden" id="editAssetId">
+        <div style="margin: 20px 0;">
+            <label class="label">자산명</label>
+            <input type="text" id="assetName" placeholder="예: 국민은행(급여)" class="input-field">
+
+            <label class="label">유형</label>
+            <select id="assetType" class="input-field">
+                <option value="bank">🏦 은행</option>
+                <option value="stock">📈 증권</option>
+                <option value="card">💳 카드</option>
+            </select>
+
+            <label class="label">현재 잔액</label>
+            <input type="number" id="assetBalance" placeholder="0" class="input-field">
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-outline" style="flex:1" onclick="closeAssetModal()">취소</button>
+            <button class="btn btn-primary" style="flex:2" onclick="saveAsset()">저장하기</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- JavaScript 로직 (기존과 동일하지만 에러 방지 처리 추가) ---
+    let assets = JSON.parse(localStorage.getItem('myAssets')) || [];
+    const assetListContainer = document.getElementById('assetList');
+    const modal = document.getElementById('assetModal');
+
+    function renderAssets() {
+        const searchTerm = document.getElementById('assetSearch').value.toLowerCase();
+        assetListContainer.innerHTML = '';
+
+        const filtered = assets.filter(asset => asset.name.toLowerCase().includes(searchTerm));
+
+        if (!assetListContainer) return;
+
+        assetListContainer.innerHTML = '';
+        if (filtered.length === 0) {
+            assetListContainer.innerHTML = '<p style="text-align:center; color:#94a3b8; padding:30px;">등록된 자산이 없습니다.</p>';
+        }
+
+        filtered.forEach(asset => {
+            const icon = asset.type === 'bank' ? '🏦' : (asset.type === 'stock' ? '📈' : '💳');
+            const item = document.createElement('div');
+            item.className = 'list-item';
+            item.innerHTML = `
+                <div class="item-info">
+                    <div class="icon">${icon}</div>
+                    <div>
+                        <strong>${asset.name}</strong>
+                        <div style="font-size:0.8rem; color:#64748b">${Number(asset.balance).toLocaleString()}원</div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-edit" onclick="openEditModal(${asset.id})">수정</button>
+                    <button class="btn-delete" onclick="deleteAsset(${asset.id})">삭제</button>
+                </div>
+            `;
+            assetListContainer.appendChild(item);
+        });
+        localStorage.setItem('myAssets', JSON.stringify(assets));
+    }
+
+    function openAddModal() {
+        document.getElementById('modalTitle').innerText = "새 자산 등록";
+        document.getElementById('editAssetId').value = "";
+        document.getElementById('assetName').value = "";
+        document.getElementById('assetBalance').value = "";
+        modal.style.display = 'grid';
+    }
+
+    function openEditModal(id) {
+        const asset = assets.find(a => a.id === id);
+        if (!asset) return;
+
+        document.getElementById('modalTitle').innerText = "자산 정보 수정";
+        document.getElementById('editAssetId').value = asset.id;
+        document.getElementById('assetName').value = asset.name;
+        document.getElementById('assetType').value = asset.type;
+        document.getElementById('assetBalance').value = asset.balance;
+        modal.style.display = 'grid';
+    }
+
+    function closeAssetModal() { modal.style.display = 'none'; }
+
+    function saveAsset() {
+        const id = document.getElementById('editAssetId').value;
+        const name = document.getElementById('assetName').value;
+        const type = document.getElementById('assetType').value;
+        const balance = parseInt(document.getElementById('assetBalance').value) || 0;
+
+        if (!name) return alert("자산 이름을 입력해주세요.");
+
+        if (id) {
+            const index = assets.findIndex(a => a.id == id);
+            assets[index] = { ...assets[index], name, type, balance };
+        } else {
+            assets.push({ id: Date.now(), name, type, balance });
+        }
+
+        renderAssets();
+        closeAssetModal();
+    }
+
+    function deleteAsset(id) {
+        if (confirm("정말로 삭제하시겠습니까?")) {
+            assets = assets.filter(a => a.id !== id);
+            renderAssets();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const addBtn = document.querySelector('.main-content .btn-primary');
+        if (addBtn) addBtn.onclick = openAddModal;
+        renderAssets();
+    });
+
+    // 배경 클릭 시 닫기 기능 추가
+    window.onclick = function(event) {
+        if (event.target == modal) closeAssetModal();
+    }
+</script>
+</body>
+</html>
