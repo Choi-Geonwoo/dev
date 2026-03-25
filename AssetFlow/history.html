@@ -23,6 +23,52 @@
 
         .btn-delete { color: var(--expense); border: none; background: none; cursor: pointer; font-size: 0.85rem; padding: 5px; }
         .btn-delete:hover { text-decoration: underline; }
+
+        /* [3] 캘린더 스타일 */
+        .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-top: 15px; }
+        .cal-cell {
+            min-height: 100px; /* 금액이 들어갈 자리를 위해 높이 확보 */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; /* 날짜는 위, 금액은 아래 배치 */
+            padding: 8px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            border-radius: 8px;
+        }
+        .cal-cell:hover { border-color: var(--primary); transform: translateY(-2px); }
+        .cal-date { font-weight: bold; font-size: 0.9rem; }
+        .cal-item {
+            font-size: 0.7rem;
+            background: #f1f5f9;
+            padding: 2px 4px;
+            margin-bottom: 2px;
+            border-radius: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .cal-total { margin-top: auto; text-align: right; color: var(--expense); font-weight: bold; font-size: 0.75rem; }
+
+        /* [1] 기존 스타일 유지 및 전환 버튼 추가 */
+        .view-controls { display: flex; background: #f1f5f9; padding: 5px; border-radius: 10px; margin-bottom: 20px; width: fit-content; }
+        .view-btn { padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; background: transparent; color: #64748b; font-weight: 600; transition: 0.2s; }
+        .view-btn.active { background: #fff; color: var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+
+        #listView, #calendarView { display: none; }
+        #listView.active, #calendarView.active { display: block; }
+
+        /* 오늘 날짜 셀 강조 */
+        .cal-cell.today {
+            border: 2px solid var(--primary);
+            background-color: #f0f7ff;
+        }
+
+        /* 이전/다음 버튼 크기 조절 */
+        .calendar-view .btn-outline {
+            padding: 5px 12px;
+            font-size: 0.85rem;
+        }
     </style>
 </head>
 <body>
@@ -47,6 +93,11 @@
         </div>
     </div>
 
+        <div class="view-controls">
+            <button id="btnList" class="view-btn active" onclick="switchView('list')">리스트 보기</button>
+            <button id="btnCal" class="view-btn" onclick="switchView('cal')">캘린더 보기</button>
+        </div>
+
     <div class="card" style="display: flex; gap: 10px; margin-bottom: 20px;">
         <input type="text" id="searchInput" placeholder="내용으로 검색..." class="input-field" style="flex: 2; margin:0;">
         <select id="filterAsset" class="input-field" style="flex: 1; margin:0;">
@@ -56,6 +107,8 @@
             <option value="">모든 카테고리</option>
         </select>
     </div>
+
+
 
     <div class="card">
         <table class="table">
@@ -72,6 +125,21 @@
             <tbody id="historyList">
             </tbody>
         </table>
+    </div>
+    <div id="calendarView" class="card" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #f8fafc; padding: 15px; border-radius: 12px;">
+            <div style="display: flex; gap: 8px;">
+                <button class="btn btn-outline" onclick="changeMonth(-1)" style="padding: 5px 15px;">◀</button>
+                <button class="btn btn-outline" onclick="goToday()" style="padding: 5px 15px;">오늘</button>
+                <button class="btn btn-outline" onclick="changeMonth(1)" style="padding: 5px 15px;">▶</button>
+            </div>
+            <h3 id="calMonthTitle" style="margin: 0; color: var(--primary); font-size: 1.25rem;">2026년 3월</h3>
+            <div style="width: 120px; text-align: right; font-size: 0.9rem; color: #64748b;">
+                월간 지출: <span id="monthTotalAmount" style="color: var(--expense); font-weight: bold;">0</span>원
+            </div>
+        </div>
+
+        <div class="cal-grid" id="historyCalGrid"></div>
     </div>
 </main>
 
@@ -133,198 +201,381 @@
 
 
 <script>
-    // 1. 데이터 불러오기
+    // 1. 초기 데이터 로드 및 전역 변수
     let histories = JSON.parse(localStorage.getItem('myHistories')) || [];
     let assets = JSON.parse(localStorage.getItem('myAssets')) || [];
     let categories = JSON.parse(localStorage.getItem('myCategories')) || [
-        {id: 1, name: '식비'}, {id: 2, name: '교통'}, {id: 3, name: '주거/통신'}, {id: 4, name: '쇼핑'}
+        {name: '식비'}, {name: '교통'}, {name: '주거/통신'}, {name: '쇼핑'}
     ];
 
-    const historyListContainer = document.getElementById('historyList');
+    // 2. 초기 화면 렌더링 및 필터 설정
+    document.addEventListener('DOMContentLoaded', () => {
+        initFilters();
+        renderHistories();
+    });
 
-    // 2. 화면에 내역 리스트 그리기
+    // 자산 및 카테고리 필터(Select Box) 옵션 초기화
+    function initFilters() {
+        const filterAsset = document.getElementById('filterAsset');
+        const filterCategory = document.getElementById('filterCategory');
+
+        if (filterAsset) {
+            filterAsset.innerHTML = '<option value="">모든 자산</option>' +
+                assets.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+        }
+        if (filterCategory) {
+            filterCategory.innerHTML = '<option value="">모든 카테고리</option>' +
+                categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+        }
+
+        // 필터 이벤트 바인딩
+        document.getElementById('searchInput').addEventListener('input', renderHistories);
+        document.getElementById('filterAsset').addEventListener('change', renderHistories);
+        document.getElementById('filterCategory').addEventListener('change', renderHistories);
+    }
+
+    // 3. 뷰 전환 로직 (리스트 <-> 캘린더)
+    function switchView(type) {
+        const listView = document.querySelector('.card:has(.table)'); // 테이블을 포함한 카드 찾기
+        const calendarView = document.getElementById('calendarView');
+        const btnList = document.getElementById('btnList');
+        const btnCal = document.getElementById('btnCal');
+
+        if (type === 'list') {
+            listView.style.display = 'block';
+            calendarView.style.display = 'none';
+            btnList.classList.add('active');
+            btnCal.classList.remove('active');
+            renderHistories();
+        } else {
+            listView.style.display = 'none';
+            calendarView.style.display = 'block';
+            btnList.classList.remove('active');
+            btnCal.classList.add('active');
+            renderCalendar();
+        }
+    }
+
+    // 4. 리스트 렌더링 (검색 및 필터링)
     function renderHistories() {
         const searchTerm = document.getElementById('searchInput').value.toLowerCase();
         const assetFilter = document.getElementById('filterAsset').value;
         const catFilter = document.getElementById('filterCategory').value;
+        const container = document.getElementById('historyList');
 
-        historyListContainer.innerHTML = '';
-
-        // 필터링 로직 적용
+        // 필터링 적용
         const filtered = histories.filter(item => {
             const matchesSearch = item.description.toLowerCase().includes(searchTerm);
-            const matchesAsset = assetFilter === "" || item.assetId === assetFilter;
+            const matchesAsset = assetFilter === "" || String(item.assetId) === String(assetFilter);
             const matchesCat = catFilter === "" || item.category === catFilter;
             return matchesSearch && matchesAsset && matchesCat;
-        });
-
-        historyListContainer.innerHTML = '';
-        filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+        }).sort((a, b) => new Date(b.date) - new Date(a.date));
 
         if (filtered.length === 0) {
-            historyListContainer.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:50px; color:#94a3b8;">거래 내역이 없습니다.</td></tr>';
-        }
-
-        filtered.forEach((item, index) => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${item.date}</td>
-                <td><span class="badge">${item.assetName}</span></td>
-                <td><span class="badge badge-cat">${item.category}</span></td>
-                <td>${item.description}</td>
-                <td class="amount minus">-${Number(item.amount).toLocaleString()}원</td>
-                <td style="text-align: right;"><button onclick="deleteHistory(${index})" class="btn-delete">삭제</button></td>
-            `;
-            historyListContainer.appendChild(tr);
-        });
-        localStorage.setItem('myHistories', JSON.stringify(filtered));
-    }
-
-    // 3. 모달 열기 및 옵션 초기화
-    function openHistoryModal() {
-        // 최신 자산 및 카테고리 데이터 로드
-        assets = JSON.parse(localStorage.getItem('myAssets')) || [];
-        if (assets.length === 0) {
-            alert("먼저 '자산 관리' 페이지에서 자산을 등록해주세요!");
-            location.href = 'assets.html';
+            container.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:50px; color:#94a3b8;">거래 내역이 없습니다.</td></tr>';
             return;
         }
 
-        // 자산 셀렉트 박스 채우기
-        const assetSelect = document.getElementById('historyAsset');
-        assetSelect.innerHTML = assets.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+        container.innerHTML = filtered.map(h => `
+            <tr>
+                <td>${h.date}</td>
+                <td><span class="badge">${h.assetName}</span></td>
+                <td><span class="badge badge-cat">${h.category}</span></td>
+                <td>${h.description}</td>
+                <td class="amount minus">-${Number(h.amount).toLocaleString()}원</td>
+                <td style="text-align: right;">
+                    <button onclick="deleteHistory('${h.id}')" class="btn-delete">삭제</button>
+                </td>
+            </tr>
+        `).join('');
+    }
 
-        // 카테고리 셀렉트 박스 채우기
-        const categorySelect = document.getElementById('historyCategory');
-        categorySelect.innerHTML = categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+    // 5. 캘린더 렌더링
+    function renderCalendar() {
+        const grid = document.getElementById('historyCalGrid');
+        grid.innerHTML = ['일','월','화','수','목','금','토'].map(d =>
+            `<div style="text-align:center; font-weight:bold; font-size:0.8rem; color:#64748b; padding-bottom:10px;">${d}</div>`
+        ).join('');
 
-        // 기본값 설정
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
+        const lastDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+        // 시작 공백
+        for (let i = 0; i < firstDay; i++) grid.innerHTML += `<div></div>`;
+
+        // 날짜 셀 생성
+        for (let d = 1; d <= lastDate; d++) {
+            const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const dayItems = histories.filter(h => h.date === dateStr);
+            const daySum = dayItems.reduce((s, h) => s + Number(h.amount), 0);
+
+            const cell = document.createElement('div');
+            cell.className = 'cal-cell';
+            cell.innerHTML = `
+                <div class="cal-date">${d}</div>
+                ${dayItems.slice(0, 2).map(h => `<div class="cal-item">${h.description}</div>`).join('')}
+                ${dayItems.length > 2 ? `<div class="cal-item" style="background:#f1f5f9; color:#64748b;">+${dayItems.length - 2}</div>` : ''}
+                ${daySum > 0 ? `<div class="cal-total">-${daySum.toLocaleString()}원</div>` : ''}
+            `;
+            grid.appendChild(cell);
+        }
+    }
+
+    // 6. 모달 및 파일 핸들링
+    function openHistoryModal() {
+        if (assets.length === 0) return alert("자산을 먼저 등록해주세요!");
+        document.getElementById('historyAsset').innerHTML = assets.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+        document.getElementById('historyCategory').innerHTML = categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
         document.getElementById('historyDate').value = new Date().toISOString().substring(0, 10);
         document.getElementById('historyModal').style.display = 'grid';
     }
 
-    function closeHistoryModal() {
-        document.getElementById('historyModal').style.display = 'none';
+    function closeHistoryModal() { document.getElementById('historyModal').style.display = 'none'; }
+
+    function openUploadModal() {
+        document.getElementById('uploadAssetSelect').innerHTML = assets.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+        document.getElementById('uploadModal').style.display = 'grid';
     }
 
-    // 4. 저장 및 자산 연동 로직
+    function closeModal() { document.getElementById('uploadModal').style.display = 'none'; }
+
+    function updateFileName(input) {
+        document.getElementById('fileNameDisplay').innerText = input.files[0] ? `📄 선택됨: ${input.files[0].name}` : "선택된 파일 없음";
+    }
+
+    // 7. 데이터 저장 및 삭제 로직
     function saveHistory() {
-        const date = document.getElementById('historyDate').value;
         const assetId = document.getElementById('historyAsset').value;
-        const category = document.getElementById('historyCategory').value;
-        const description = document.getElementById('historyDesc').value;
         const amount = parseInt(document.getElementById('historyAmount').value);
+        const desc = document.getElementById('historyDesc').value;
+        if (!desc || isNaN(amount)) return alert("내용과 금액을 입력해주세요.");
 
-        if (!description || !amount) return alert("내용과 금액을 입력해주세요.");
+        const targetAsset = assets.find(a => String(a.id) === String(assetId));
 
-        // 자산 잔액 차감 로직
-        const assetIndex = assets.findIndex(a => a.id == assetId);
-        if (assetIndex !== -1) {
-            assets[assetIndex].balance -= amount;
-            localStorage.setItem('myAssets', JSON.stringify(assets));
-
-            // 내역 객체 생성
-            const newEntry = {
-                date,
-                assetId,
-                assetName: assets[assetIndex].name,
-                category,
-                description,
-                amount
-            };
-
-            histories.push(newEntry);
-            renderHistories();
-            closeHistoryModal();
-
-            // 입력 폼 초기화
-            document.getElementById('historyDesc').value = '';
-            document.getElementById('historyAmount').value = '';
-        }
-    }
-
-    // 5. 삭제 및 자산 복구 로직
-    function deleteHistory(index) {
-        if(confirm("내역을 삭제하시겠습니까? (삭제 시 해당 자산 잔액이 복구됩니다)")) {
-            const item = histories[index];
-            const assetIndex = assets.findIndex(a => a.id == item.assetId);
-
-            if (assetIndex !== -1) {
-                assets[assetIndex].balance += Number(item.amount); // 금액 복구
-                localStorage.setItem('myAssets', JSON.stringify(assets));
-            }
-
-            histories.splice(index, 1);
-            renderHistories();
-        }
-    }
-
-    // 초기 실행
-    document.addEventListener('DOMContentLoaded', renderHistories);
-
-    // 1. 업로드 모달 열기 (자산 목록 업데이트)
-function openUploadModal() {
-    assets = JSON.parse(localStorage.getItem('myAssets')) || [];
-    const uploadSelect = document.getElementById('uploadAssetSelect');
-
-    if (assets.length === 0) {
-        alert("자산을 먼저 등록해주세요!");
-        location.href = 'assets.html';
-        return;
-    }
-
-    // 자산 목록 주입
-    uploadSelect.innerHTML = assets.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
-    document.getElementById('uploadModal').style.display = 'grid';
-}
-
-function closeModal() {
-    document.getElementById('uploadModal').style.display = 'none';
-}
-
-// 2. 업로드 처리 로직 (매칭 핵심)
-function processUpload() {
-    const assetId = document.getElementById('uploadAssetSelect').value;
-    const fileInput = document.getElementById('excelFile');
-
-    if (!fileInput.files.length) return alert("파일을 선택해주세요.");
-
-    // 선택된 자산 정보 가져오기
-    const targetAsset = assets.find(a => a.id == assetId);
-
-    /* [참고] 실제 구현 시에는 FileReader를 통해 엑셀 내용을 읽습니다.
-       여기서는 파일의 한 줄을 읽었다고 가정(Mockup)한 로직입니다.
-    */
-    const mockExcelData = [
-        { date: "2026-03-25", description: "마트 장보기", amount: 45000 },
-        { date: "2026-03-24", description: "주유비", amount: 60000 }
-    ];
-
-    mockExcelData.forEach(row => {
-        // [핵심 매칭] 엑셀 데이터 + 선택한 자산 정보 결합
         const newEntry = {
-            date: row.date,
-            assetId: targetAsset.id,     // 선택한 자산 ID 매칭
-            assetName: targetAsset.name, // 선택한 자산 이름 매칭
-            category: "미분류",           // 카테고리는 추후 AI나 키워드로 분류
-            description: row.description,
-            amount: row.amount
+            id: Date.now().toString(), // 고유 ID 부여
+            date: document.getElementById('historyDate').value,
+            assetId,
+            assetName: targetAsset.name,
+            category: document.getElementById('historyCategory').value,
+            description: desc,
+            amount: amount
         };
 
-        // 1. 내역 저장
         histories.push(newEntry);
+        targetAsset.balance -= amount; // 자산 연동 차감
 
-        // 2. 자산 잔액 실시간 차감 (연동)
-        targetAsset.balance -= row.amount;
-    });
+        syncAndRefresh();
+        closeHistoryModal();
+    }
 
-    // 전체 데이터 업데이트 및 저장
-    localStorage.setItem('myHistories', JSON.stringify(histories));
-    localStorage.setItem('myAssets', JSON.stringify(assets));
+    function processUpload() {
+        const assetId = document.getElementById('uploadAssetSelect').value;
+        const targetAsset = assets.find(a => String(a.id) === String(assetId));
+        const fileInput = document.getElementById('excelFile');
 
-    alert(`${targetAsset.name}으로 ${mockExcelData.length}건의 내역이 성공적으로 업로드되었습니다!`);
-    renderHistories();
-    closeModal();
+        if (!fileInput.files.length) return alert("파일을 선택해주세요.");
+
+        // CSV 파싱 로직의 Mockup (실제 구현 시 FileReader 사용 가능)
+        const mockExcelData = [
+            { date: new Date().toISOString().substring(0, 10), description: "업로드 테스트1", amount: 15000 },
+            { date: new Date().toISOString().substring(0, 10), description: "업로드 테스트2", amount: 3200 }
+        ];
+
+        mockExcelData.forEach(row => {
+            histories.push({
+                id: (Date.now() + Math.random()).toString(),
+                date: row.date,
+                assetId,
+                assetName: targetAsset.name,
+                category: "미분류",
+                description: row.description,
+                amount: row.amount
+            });
+            targetAsset.balance -= row.amount;
+        });
+
+        syncAndRefresh();
+        closeModal();
+        alert("업로드가 완료되었습니다.");
+    }
+
+    function deleteHistory(id) {
+        if (!confirm("삭제하시겠습니까? (자산 잔액이 복구됩니다)")) return;
+
+        const index = histories.findIndex(h => h.id === id);
+        if (index !== -1) {
+            const item = histories[index];
+            const asset = assets.find(a => String(a.id) === String(item.assetId));
+            if (asset) asset.balance += Number(item.amount); // 잔액 복구
+
+            histories.splice(index, 1);
+            syncAndRefresh();
+        }
+    }
+
+    // 8. 로컬 스토리지 동기화 및 화면 갱신
+    function syncAndRefresh() {
+        localStorage.setItem('myHistories', JSON.stringify(histories));
+        localStorage.setItem('myAssets', JSON.stringify(assets));
+        renderHistories();
+        renderCalendar();
+    }
+
+    // [추가] 현재 캘린더가 보여주고 있는 기준 날짜 (기본값: 오늘)
+let viewDate = new Date();
+
+// [수정] 캘린더 렌더링 함수
+function renderCalendar() {
+    const grid = document.getElementById('historyCalGrid');
+    const monthTitle = document.getElementById('calMonthTitle');
+
+    // 현재 보고 있는 연/월 추출
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth(); // 0 ~ 11
+
+    // 제목 업데이트
+    monthTitle.innerText = `${year}년 ${month + 1}월`;
+
+    grid.innerHTML = ['일','월','화','수','목','금','토'].map(d =>
+        `<div style="text-align:center; font-weight:bold; font-size:0.8rem; color:#64748b; padding-bottom:10px;">${d}</div>`
+    ).join('');
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const lastDate = new Date(year, month + 1, 0).getDate();
+
+    // 시작 공백
+    for (let i = 0; i < firstDay; i++) grid.innerHTML += `<div></div>`;
+
+    // 날짜 셀 생성
+    for (let d = 1; d <= lastDate; d++) {
+        // 비교를 위해 YYYY-MM-DD 형식 생성
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+        const dayItems = histories.filter(h => h.date === dateStr);
+        const daySum = dayItems.reduce((s, h) => s + Number(h.amount), 0);
+
+        const isToday = new Date().toISOString().substring(0, 10) === dateStr;
+
+        const cell = document.createElement('div');
+        cell.className = `cal-cell ${isToday ? 'today' : ''}`; // 오늘 날짜 강조 클래스(선택)
+
+        cell.innerHTML = `
+            <div class="cal-date" style="${isToday ? 'color:var(--primary);' : ''}">${d}</div>
+            ${dayItems.slice(0, 2).map(h => `<div class="cal-item">${h.description}</div>`).join('')}
+            ${dayItems.length > 2 ? `<div class="cal-item" style="background:#f1f5f9; color:#64748b;">+${dayItems.length - 2}</div>` : ''}
+            ${daySum > 0 ? `<div class="cal-total">-${daySum.toLocaleString()}원</div>` : ''}
+        `;
+        grid.appendChild(cell);
+    }
+}
+
+// [추가] 월 변경 함수
+function changeMonth(offset) {
+    // viewDate의 월을 offset만큼 가감
+    viewDate.setMonth(viewDate.getMonth() + offset);
+    renderCalendar();
+}
+
+// 1. 오늘 날짜로 이동
+function goToday() {
+    viewDate = new Date();
+    renderCalendar();
+}
+
+// 2. 월 변경 함수 (offset: -1 이면 이전달, 1 이면 다음달)
+function changeMonth(offset) {
+    viewDate.setMonth(viewDate.getMonth() + offset);
+    renderCalendar();
+}
+
+// 3. 캘린더 렌더링 함수 (확장판)
+function renderCalendar() {
+    const grid = document.getElementById('historyCalGrid');
+    const monthTitle = document.getElementById('calMonthTitle');
+
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+
+    monthTitle.innerText = `${year}년 ${month + 1}월`;
+
+    // 요일 헤더
+    const days = ['일','월','화','수','목','금','토'];
+
+    grid.innerHTML = days.map((d, i) => {
+        let color = '#64748b'; // 기본 색상
+
+        if (i === 0) color = '#ef4444'; // 일요일 (빨강)
+        if (i === 6) color = '#3b82f6'; // 토요일 (파랑)
+
+        return `
+            <div style="
+                text-align:center;
+                font-weight:bold;
+                font-size:0.8rem;
+                color:${color};
+                padding-bottom:10px;
+            ">
+                ${d}
+            </div>
+        `;
+    }).join('');
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const lastDate = new Date(year, month + 1, 0).getDate();
+
+    // 공백 채우기
+    for (let i = 0; i < firstDay; i++) grid.innerHTML += `<div></div>`;
+
+    // 날짜별 셀 생성
+    for (let d = 1; d <= lastDate; d++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+        // 1. 해당 날짜의 모든 내역 필터링
+        const dayItems = histories.filter(h => h.date === dateStr);
+
+        // 2. 해당 날짜의 총 지출 금액 합산
+        const daySum = dayItems.reduce((acc, cur) => acc + Number(cur.amount), 0);
+
+        const cell = document.createElement('div');
+        cell.className = 'cal-cell';
+
+        // 셀 내부 구성: 날짜 + 내역(최대2개) + [추가] 총 금액
+        cell.innerHTML = `
+            <div class="cal-date">${d}</div>
+            <div class="cal-content" style="flex: 1; overflow: hidden;">
+                ${dayItems.slice(0, 2).map(h => `<div class="cal-item">${h.description}</div>`).join('')}
+            </div>
+            ${daySum > 0 ? `<div class="cal-total" style="color: #e11d48; font-weight: bold; font-size: 0.75rem; text-align: right; margin-top: 5px;">
+                -${daySum.toLocaleString()}원
+            </div>` : ''}
+        `;
+
+        grid.appendChild(cell);
+    }
+}
+
+// [수정] switchView 함수에서 캘린더 호출 시 renderCalendar()가 정상 작동하도록 연결
+function switchView(type) {
+    const listView = document.querySelector('.card:has(.table)');
+    const calendarView = document.getElementById('calendarView');
+    const btnList = document.getElementById('btnList');
+    const btnCal = document.getElementById('btnCal');
+
+    if (type === 'list') {
+        listView.style.display = 'block';
+        calendarView.style.display = 'none';
+        btnList.classList.add('active');
+        btnCal.classList.remove('active');
+        renderHistories();
+    } else {
+        listView.style.display = 'none';
+        calendarView.style.display = 'block';
+        btnList.classList.remove('active');
+        btnCal.classList.add('active');
+        renderCalendar(); // 여기서 확장된 캘린더 호출
+    }
 }
 </script>
 
