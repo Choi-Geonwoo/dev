@@ -36,8 +36,6 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
-          # path: '.'
           # 바로 이 부분에 배포하고 싶은 폴더 경로를 적습니다!
           path: 'dev/AssetFlow'
       - name: Deploy to GitHub Pages
