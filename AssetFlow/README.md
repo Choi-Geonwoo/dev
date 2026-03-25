@@ -4,6 +4,8 @@
 ### 구분 : AssetFlow
 
 🗄️ 가계부 데이터베이스 테이블 설계 (ERD 구조)
+
+### 테이블 설계
 1. Assets (자산 테이블)
 - 사용자의 현금, 은행 계좌, 카드 등 돈이 머무는 곳을 정의합니다.
 
@@ -44,3 +46,22 @@
 | `is_deleted` | BOOLEAN | DEFAULT FALSE | **삭제 여부 (Soft Delete)** |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | **등록 일자** |
 | `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | **수정 일자** |
+
+### 2. 화면 설계
+1. 대시보드
+<img width="1245" height="943" alt="2026-03-25 14 43 13" src="https://github.com/user-attachments/assets/d1ce4ea6-8202-488b-aebc-1e52eba4f697" />
+
+2. 거래내역
+- 리스트
+<img width="1245" height="943" alt="2026-03-25 14 43 13 (2)" src="https://github.com/user-attachments/assets/924e203c-227f-45d4-aea2-86968e7d5355" />
+
+- 캘린더
+<img width="1245" height="943" alt="2026-03-25 14 43 13 (3)" src="https://github.com/user-attachments/assets/41c997e4-f245-4093-a069-ff3c2665819b" />
+
+3. 자산 관리
+<img width="1245" height="943" alt="2026-03-25 14 43 13 (4)" src="https://github.com/user-attachments/assets/e90f1ed8-7023-48a8-9ef9-722db453e6a0" />
+
+4. 카테고리 예산관리
+<img width="1245" height="943" alt="2026-03-25 14 43 13 (5)" src="https://github.com/user-attachments/assets/48b9b18d-1ea3-4a69-a5a5-3b05d8250ac3" />
+
+
